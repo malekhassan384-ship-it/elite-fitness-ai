@@ -1,0 +1,484 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// AUTHENTICATION & ROLES
+// ==========================================
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  password            String
+  fullName            String
+  phoneNumber         String?
+  gender              String?   // MALE, FEMALE, OTHER
+  dateOfBirth         DateTime?
+  isEmailVerified     Boolean   @default(false)
+  isPhoneVerified     Boolean   @default(false)
+  isActive            Boolean   @default(true)
+  lastLoginAt         DateTime?
+  roleId              String
+  role                Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  profile             Profile?
+  workouts            Workout[]
+  nutritionLogs       NutritionLog[]
+  progressTracking    ProgressTracking[]
+  measurements        Measurement[]
+  achievements        Achievement[]
+  chatHistories       ChatHistory[]
+  communityPosts      CommunityPost[]
+  comments            Comment[]
+  likes               Like[]
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@map("users")
+}
+
+// ==========================================
+// USER PROFILE & SETTINGS
+// ==========================================
+
+model Profile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  height            Float?   // cm
+  weight            Float?   // kg
+  fitnessGoal       String?  // FAT_LOSS, MUSCLE_GAIN, MAINTENANCE, ATHLETIC
+  activityLevel     String?  // SEDENTARY, LIGHT, MODERATE, ACTIVE, VERY_ACTIVE
+  preferredLanguage String   @default("en") // en, ar
+  
+  profileImage      String?  // Cloudinary URL
+  bio               String?
+  socialLinks       Json?    // { twitter, instagram, linkedin }
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("profiles")
+}
+
+// ==========================================
+// EXERCISES & WORKOUTS
+// ==========================================
+
+model ExerciseCategory {
+  id            String     @id @default(cuid())
+  name          String     @unique
+  nameAr        String     @unique
+  description   String?
+  descriptionAr String?
+  exercises     Exercise[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("exercise_categories")
+}
+
+model Exercise {
+  id                String             @id @default(cuid())
+  name              String
+  nameAr            String
+  description       String?
+  descriptionAr     String?
+  categoryId        String
+  category          ExerciseCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  difficulty        String             // BEGINNER, INTERMEDIATE, ADVANCED
+  equipment         String?            // BARBELL, DUMBBELL, BODYWEIGHT, CABLE, MACHINE
+  caloriesBurned    Float              // per 10 minutes
+  duration          Int                // minutes
+  
+  instructions      String?
+  instructionsAr    String?
+  safetyTips        String?
+  safetyTipsAr      String?
+  breathingGuide    String?
+  breathingGuideAr  String?
+  commonMistakes    String?
+  commonMistakesAr  String?
+  targetMuscles     String?            // JSON array
+  
+  imageUrl          String?            // Cloudinary
+  videoUrl          String?            // YouTube
+  
+  workoutExercises  WorkoutExercise[]
+  logs              ExerciseLog[]
+  
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@map("exercises")
+}
+
+model Workout {
+  id                String             @id @default(cuid())
+  userId            String
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name              String
+  nameAr            String?
+  description       String?
+  descriptionAr     String?
+  
+  type              String             // STRENGTH, CARDIO, FLEXIBILITY, HIIT
+  difficulty        String             // BEGINNER, INTERMEDIATE, ADVANCED
+  
+  duration          Int                // minutes
+  caloriesBurned    Float?
+  
+  isCompleted       Boolean            @default(false)
+  completedAt       DateTime?
+  
+  exercises         WorkoutExercise[]
+  logs              ExerciseLog[]
+  
+  scheduledDate     DateTime?
+  
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@map("workouts")
+}
+
+model WorkoutExercise {
+  id              String   @id @default(cuid())
+  workoutId       String
+  workout         Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exerciseId      String
+  exercise        Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  
+  sets            Int      @default(3)
+  reps            Int?
+  duration        Int?     // seconds or minutes
+  weight          Float?   // kg
+  restTime        Int?     // seconds
+  notes           String?
+  
+  orderIndex      Int      @default(0)
+
+  @@map("workout_exercises")
+}
+
+model ExerciseLog {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutId       String
+  workout         Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exerciseId      String
+  exercise        Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  
+  sets            Int
+  reps            Int?
+  weight          Float?   // kg
+  duration        Int?     // minutes
+  caloriesBurned  Float?
+  
+  notes           String?
+  
+  loggedAt        DateTime @default(now())
+
+  @@map("exercise_logs")
+}
+
+// ==========================================
+// NUTRITION SYSTEM
+// ==========================================
+
+model FoodCategory {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  nameAr        String   @unique
+  foods         Food[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("food_categories")
+}
+
+model Food {
+  id              String   @id @default(cuid())
+  name            String
+  nameAr          String
+  categoryId      String
+  category        FoodCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  calories        Float
+  protein         Float    // grams
+  carbs           Float    // grams
+  fats            Float    // grams
+  fiber           Float?   // grams
+  
+  servingSize     String   // "100g", "1 cup", etc
+  servingSizeAr   String?
+  
+  nutritionLogs   NutritionLog[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("foods")
+}
+
+model NutritionLog {
+  id              String   @id @default(now())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  foodId          String
+  food            Food     @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  
+  quantity        Float    // number of servings
+  
+  calories        Float
+  protein         Float
+  carbs           Float
+  fats            Float
+  fiber           Float?
+  
+  mealType        String   // BREAKFAST, LUNCH, DINNER, SNACK
+  
+  loggedAt        DateTime @default(now())
+
+  @@map("nutrition_logs")
+}
+
+model MealPlan {
+  id              String   @id @default(cuid())
+  userId          String?  // null if template
+  
+  name            String
+  nameAr          String?
+  description     String?
+  
+  type            String   // FAT_LOSS, MUSCLE_GAIN, MAINTENANCE
+  
+  dailyCalories   Float
+  dailyProtein    Float
+  dailyCarbs      Float
+  dailyFats       Float
+  
+  meals           Json     // Array of meals
+  
+  startDate       DateTime?
+  endDate         DateTime?
+  
+  isTemplate      Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("meal_plans")
+}
+
+// ==========================================
+// PROGRESS TRACKING
+// ==========================================
+
+model ProgressTracking {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  weight          Float?   // kg
+  bodyFat         Float?   // percentage
+  bmi             Float?
+  muscleMass      Float?   // kg
+  
+  dailyCalories   Float?
+  dailyWater      Int?     // ml
+  
+  recordedAt      DateTime @default(now())
+
+  @@map("progress_tracking")
+}
+
+model Measurement {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  waist           Float?   // cm
+  chest           Float?   // cm
+  arms            Float?   // cm
+  thighs          Float?   // cm
+  neck            Float?   // cm
+  
+  bodyFatPercent  Float?
+  
+  photos          String[] // Cloudinary URLs
+  
+  recordedAt      DateTime @default(now())
+
+  @@map("measurements")
+}
+
+// ==========================================
+// ACHIEVEMENTS & GAMIFICATION
+// ==========================================
+
+model Achievement {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name            String
+  nameAr          String?
+  description     String?
+  descriptionAr   String?
+  
+  type            String   // WORKOUT_STREAK, WEIGHT_LOSS, MUSCLE_GAIN, CONSISTENCY
+  
+  badge           String?  // emoji or icon
+  
+  unlockedAt      DateTime @default(now())
+
+  @@map("achievements")
+}
+
+// ==========================================
+// AI & CHAT SYSTEM
+// ==========================================
+
+model ChatHistory {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  role            String   // user, assistant
+  content         String   @db.Text
+  language        String   @default("en") // en, ar
+  
+  conversationId  String   // Group related messages
+  
+  createdAt       DateTime @default(now())
+
+  @@map("chat_histories")
+}
+
+// ==========================================
+// COMMUNITY & SOCIAL
+// ==========================================
+
+model CommunityPost {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title           String
+  content         String   @db.Text
+  
+  image           String?  // Cloudinary URL
+  
+  likes           Like[]
+  comments        Comment[]
+  
+  likesCount      Int      @default(0)
+  commentsCount   Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("community_posts")
+}
+
+model Comment {
+  id              String   @id @default(cuid())
+  postId          String
+  post            CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  content         String   @db.Text
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("comments")
+}
+
+model Like {
+  id              String   @id @default(cuid())
+  postId          String
+  post            CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@map("likes")
+}
+
+// ==========================================
+// NOTIFICATIONS
+// ==========================================
+
+model Notification {
+  id              String   @id @default(cuid())
+  userId          String?
+  
+  type            String   // WORKOUT_REMINDER, WATER_REMINDER, GOAL_ACHIEVED, AI_RECOMMENDATION
+  title           String
+  titleAr         String?
+  message         String
+  messageAr       String?
+  
+  data            Json?    // Additional data
+  
+  isRead          Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+
+  @@map("notifications")
+}
+
+// ==========================================
+// VIDEOS
+// ==========================================
+
+model Video {
+  id              String   @id @default(cuid())
+  
+  youtubeId       String   @unique
+  title           String
+  description     String?  @db.Text
+  
+  channel         String
+  duration        Int      // seconds
+  
+  thumbnail       String   // YouTube thumbnail URL
+  
+  category        String?  // Exercise category
+  language        String   @default("en") // en, ar
+  
+  views           Int      @default(0)
+  
+  addedAt         DateTime @default(now())
+
+  @@map("videos")
+}
